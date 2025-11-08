@@ -116,7 +116,7 @@ export class ScryfallClient {
 		// Handle HTTP 429 (Too Many Requests) with exponential backoff
 		if (response.status === 429) {
 			if (retryCount < this.maxRetries) {
-				const backoffTime = this.initialBackoff * Math.pow(2, retryCount);
+				const backoffTime = this.initialBackoff * 2 ** retryCount;
 				console.warn(
 					`Rate limit hit (429). Retrying after ${backoffTime}ms (attempt ${retryCount + 1}/${this.maxRetries})`,
 				);
