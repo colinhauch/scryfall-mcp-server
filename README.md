@@ -242,10 +242,41 @@ scryfall-mcp-server/
 
 ## API Rate Limiting
 
-The Scryfall client respects Scryfall's rate limiting guidelines:
-- 100ms delay between requests (configurable)
-- Proper error handling for API errors
-- User-Agent header identification
+The Scryfall client implements comprehensive rate limiting to comply with [Scryfall API guidelines](https://scryfall.com/docs/api):
+
+### Automatic Rate Limiting
+- **Default delay**: 100ms between requests (Scryfall recommends 50-100ms)
+- **Configurable**: Customize delay via `ScryfallClientOptions`
+- **Prevents HTTP 429**: Proactive rate limiting avoids "Too Many Requests" errors
+
+### HTTP 429 Retry with Exponential Backoff
+When rate limits are exceeded, the client automatically retries with exponential backoff:
+- **Default retries**: 3 attempts
+- **Backoff strategy**: 1s, 2s, 4s (exponential)
+- **Configurable**: Customize via `maxRetries` and `initialBackoff` options
+
+### Configuration Options
+
+```typescript
+const client = new ScryfallClient({
+  requestDelay: 100,      // Delay between requests (ms)
+  maxRetries: 3,          // Max retry attempts for 429 errors
+  initialBackoff: 1000,   // Initial backoff time (ms)
+  userAgent: 'your-app',  // Custom User-Agent
+});
+```
+
+### Best Practices
+- **Cache responses**: Store card data locally for 24+ hours
+- **Batch requests**: Group related queries when possible
+- **Monitor logs**: Watch for rate limit warnings in console
+- **Adjust delays**: Increase `requestDelay` if you frequently hit 429s
+
+### Error Handling
+The client throws `ScryfallAPIError` with detailed information:
+- HTTP status code
+- Error code from Scryfall
+- Human-readable error message
 
 ## Contributing
 
