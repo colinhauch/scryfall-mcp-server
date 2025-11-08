@@ -40,6 +40,8 @@ export interface ScryfallClientOptions {
 	baseUrl?: string;
 	userAgent?: string;
 	requestDelay?: number; // Scryfall asks for 50-100ms between requests
+	maxRetries?: number; // Maximum number of retries for rate limit errors
+	initialBackoff?: number; // Initial backoff time in ms for exponential backoff
 }
 
 export class ScryfallClient {
@@ -47,11 +49,15 @@ export class ScryfallClient {
 	private userAgent: string;
 	private lastRequestTime: number = 0;
 	private requestDelay: number;
+	private maxRetries: number;
+	private initialBackoff: number;
 
 	constructor(options: ScryfallClientOptions = {}) {
 		this.baseUrl = options.baseUrl || "https://api.scryfall.com";
 		this.userAgent = options.userAgent || "scryfall-mcp-server/0.0.0";
-		this.requestDelay = options.requestDelay || 100; // 100ms default
+		this.requestDelay = options.requestDelay || 100; // 100ms default (Scryfall recommends 50-100ms)
+		this.maxRetries = options.maxRetries || 3; // Default 3 retries for rate limit errors
+		this.initialBackoff = options.initialBackoff || 1000; // 1 second initial backoff
 	}
 
 	/**
@@ -71,9 +77,27 @@ export class ScryfallClient {
 	}
 
 	/**
-	 * Generic fetch method with error handling
+	 * Sleep for a specified duration
+	 */
+	private async sleep(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	/**
+	 * Generic fetch method with error handling and retry logic
 	 */
 	private async fetch<T>(endpoint: string, init?: RequestInit): Promise<T> {
+		return this.fetchWithRetry<T>(endpoint, init, 0);
+	}
+
+	/**
+	 * Internal fetch with exponential backoff retry logic
+	 */
+	private async fetchWithRetry<T>(
+		endpoint: string,
+		init: RequestInit | undefined,
+		retryCount: number,
+	): Promise<T> {
 		await this.respectRateLimit();
 
 		const url = endpoint.startsWith("http")
@@ -88,6 +112,24 @@ export class ScryfallClient {
 				...init?.headers,
 			},
 		});
+
+		// Handle HTTP 429 (Too Many Requests) with exponential backoff
+		if (response.status === 429) {
+			if (retryCount < this.maxRetries) {
+				const backoffTime = this.initialBackoff * Math.pow(2, retryCount);
+				console.warn(
+					`Rate limit hit (429). Retrying after ${backoffTime}ms (attempt ${retryCount + 1}/${this.maxRetries})`,
+				);
+				await this.sleep(backoffTime);
+				return this.fetchWithRetry<T>(endpoint, init, retryCount + 1);
+			}
+			throw new ScryfallAPIError(
+				"Rate limit exceeded and max retries reached",
+				"rate_limit_error",
+				429,
+				"Too many requests. Please reduce request frequency.",
+			);
+		}
 
 		const data = await response.json();
 

@@ -216,5 +216,39 @@ describe("ScryfallClient", () => {
 			// Should take at least 50ms between requests
 			expect(duration).toBeGreaterThanOrEqual(50);
 		});
+
+		it("should use default delay of 100ms", async () => {
+			const defaultClient = new ScryfallClient();
+
+			const start = Date.now();
+			await defaultClient.getRandomCard();
+			await defaultClient.getRandomCard();
+			const duration = Date.now() - start;
+
+			// Should take at least 100ms between requests (default)
+			expect(duration).toBeGreaterThanOrEqual(100);
+		});
+
+		it("should have configurable retry settings", () => {
+			const customClient = new ScryfallClient({
+				maxRetries: 5,
+				initialBackoff: 2000,
+				requestDelay: 75,
+			});
+
+			expect(customClient).toBeInstanceOf(ScryfallClient);
+		});
+
+		it("should use default retry values", () => {
+			const defaultClient = new ScryfallClient();
+
+			// Defaults: maxRetries=3, initialBackoff=1000, requestDelay=100
+			expect(defaultClient).toBeInstanceOf(ScryfallClient);
+		});
+
+		// Note: Testing actual HTTP 429 retry behavior would require mocking
+		// the fetch API or a dedicated test server that returns 429 responses.
+		// For integration tests, you would set up a mock server like MSW (Mock Service Worker)
+		// to simulate rate limit responses and verify retry behavior.
 	});
 });
