@@ -2,6 +2,8 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ScryfallClient, ScryfallAPIError } from "./scryfall/client";
+import { formatCard, formatCards } from "./scryfall/formatter.js";
+import type { CardField, CardFieldGroup } from "./scryfall/types.js";
 
 // Define our MCP agent with Scryfall tools
 export class MyMCP extends McpAgent {
@@ -48,8 +50,24 @@ export class MyMCP extends McpAgent {
 					.optional()
 					.describe("Sort direction"),
 				page: z.number().optional().describe("Page number for pagination"),
+				fields: z
+					.union([
+						z.array(z.string()),
+						z.enum([
+							"minimal",
+							"gameplay",
+							"print",
+							"pricing",
+							"imagery",
+							"full",
+						]),
+					])
+					.optional()
+					.describe(
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'print', 'pricing', 'imagery', 'full')",
+					),
 			},
-			async ({ query, unique, order, dir, page }) => {
+			async ({ query, unique, order, dir, page, fields }) => {
 				try {
 					const result = await this.scryfallClient.searchCards(query, {
 						unique,
@@ -58,6 +76,24 @@ export class MyMCP extends McpAgent {
 						page,
 					});
 
+					// If fields are specified, use the formatter
+					if (fields) {
+						const formatted = formatCards(
+							result.data,
+							fields as CardField[] | CardFieldGroup,
+							10,
+						);
+						return {
+							content: [
+								{
+									type: "text",
+									text: formatted,
+								},
+							],
+						};
+					}
+
+					// Default formatting (backward compatible)
 					const summary = `Found ${result.total_cards || result.data.length} cards matching "${query}"`;
 					const cardList = result.data
 						.slice(0, 10)
@@ -109,14 +145,47 @@ export class MyMCP extends McpAgent {
 					.string()
 					.optional()
 					.describe("Set code to filter by (e.g., 'mkm')"),
+				fields: z
+					.union([
+						z.array(z.string()),
+						z.enum([
+							"minimal",
+							"gameplay",
+							"print",
+							"pricing",
+							"imagery",
+							"full",
+						]),
+					])
+					.optional()
+					.describe(
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'print', 'pricing', 'imagery', 'full')",
+					),
 			},
-			async ({ name, fuzzy, set }) => {
+			async ({ name, fuzzy, set, fields }) => {
 				try {
 					const card = await this.scryfallClient.getCardNamed(name, {
 						fuzzy,
 						set,
 					});
 
+					// If fields are specified, use the formatter
+					if (fields) {
+						const formatted = formatCard(
+							card,
+							fields as CardField[] | CardFieldGroup,
+						);
+						return {
+							content: [
+								{
+									type: "text",
+									text: formatted,
+								},
+							],
+						};
+					}
+
+					// Default formatting (backward compatible)
 					const price = card.prices.usd ? `$${card.prices.usd}` : "N/A";
 					const text = card.oracle_text || "No oracle text";
 					const image =
@@ -172,11 +241,44 @@ Scryfall: ${card.scryfall_uri}`,
 					.describe(
 						"Optional search query to filter random selection (e.g., 'type:creature')",
 					),
+				fields: z
+					.union([
+						z.array(z.string()),
+						z.enum([
+							"minimal",
+							"gameplay",
+							"print",
+							"pricing",
+							"imagery",
+							"full",
+						]),
+					])
+					.optional()
+					.describe(
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'print', 'pricing', 'imagery', 'full')",
+					),
 			},
-			async ({ query }) => {
+			async ({ query, fields }) => {
 				try {
 					const card = await this.scryfallClient.getRandomCard(query);
 
+					// If fields are specified, use the formatter
+					if (fields) {
+						const formatted = formatCard(
+							card,
+							fields as CardField[] | CardFieldGroup,
+						);
+						return {
+							content: [
+								{
+									type: "text",
+									text: `**Random Card**\n\n${formatted}`,
+								},
+							],
+						};
+					}
+
+					// Default formatting (backward compatible)
 					const price = card.prices.usd ? `$${card.prices.usd}` : "N/A";
 					const image =
 						card.image_uris?.normal ||
