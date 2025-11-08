@@ -25,6 +25,14 @@ This is a Model Context Protocol (MCP) server that wraps the Scryfall API for Ma
 ### Type Definitions (`src/scryfall/types.ts`)
 Comprehensive TypeScript interfaces mirroring the Scryfall API schema. When adding new API endpoints, add corresponding type definitions here.
 
+**Field Selection Types**: Includes `CardField` (union of all card fields), `CardFieldGroup` (predefined groups), and `FIELD_GROUP_MAPPINGS` for convenient field selection.
+
+### Card Formatter (`src/scryfall/formatter.ts`)
+- **formatCard()**: Formats a single card with optional field selection
+- **formatCards()**: Formats multiple cards with optional field selection and limit
+- Supports both custom field arrays (e.g., `["name", "mana_cost", "prices.usd"]`) and predefined groups (e.g., `"minimal"`, `"gameplay"`)
+- Handles single-faced and multi-faced cards appropriately
+
 ## Development Commands
 
 ### Running Locally
@@ -57,6 +65,55 @@ npm run deploy    # Manual deploy to Cloudflare Workers
 
 Auto-deployment occurs on push to `main` via GitHub Actions (requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets).
 
+## Using Field Selection
+
+The card-related MCP tools (`search_cards`, `get_card`, `get_random_card`) support optional field selection to control which card data is returned, allowing agents to modulate context usage.
+
+### Field Selection Options
+
+**Custom Field Arrays**: Specify exact fields to include
+```typescript
+fields: ["name", "mana_cost", "prices.usd"]
+```
+
+**Predefined Groups**: Use convenient shortcuts
+- `"minimal"` - Basic card info: name, mana_cost, type_line, oracle_text
+- `"gameplay"` - Gameplay-relevant: minimal + colors, cmc, power, toughness, loyalty, legalities
+- `"print"` - Print info: gameplay + set, set_name, rarity, collector_number, artist
+- `"pricing"` - Price data: print + prices
+- `"imagery"` - Image data: print + image_uris, illustration_id
+- `"full"` - All available fields (default behavior when no fields specified)
+
+### Nested Field Access
+
+Access nested object properties using dot notation:
+```typescript
+fields: ["name", "prices.usd", "prices.eur", "image_uris.normal"]
+```
+
+### Examples
+
+```typescript
+// Minimal context - just the essentials
+search_cards({ query: "lightning bolt", fields: "minimal" })
+
+// Custom selection for specific use case
+get_card({ name: "Black Lotus", fields: ["name", "mana_cost", "prices.usd", "legalities"] })
+
+// Predefined group for gameplay analysis
+search_cards({ query: "type:creature power>=5", fields: "gameplay" })
+
+// No fields parameter = default formatting (backward compatible)
+get_card({ name: "Mox Ruby" })
+```
+
+### Behavior Notes
+
+- **Default**: When `fields` is not specified, tools use their original formatting (backward compatible)
+- **Multi-faced cards**: Field selection applies to both faces when applicable, with card-level properties shown separately
+- **Missing fields**: Fields that don't exist or are null/undefined are omitted from output
+- **Complex fields**: Objects (like `legalities`, `prices`) are formatted as JSON when selected
+
 ## Adding New Scryfall Tools
 
 1. **Add method to ScryfallClient** (`src/scryfall/client.ts`):
@@ -68,13 +125,14 @@ Auto-deployment occurs on push to `main` via GitHub Actions (requires `CLOUDFLAR
 
 3. **Register tool in MyMCP** (`src/index.ts`):
    - Call `this.server.tool()` in the `init()` method
-   - Define Zod schema for parameters
-   - Format response for MCP clients (text content)
+   - Define Zod schema for parameters (include optional `fields` parameter for card data tools)
+   - Format response for MCP clients (use `formatCard()`/`formatCards()` when fields are specified)
    - Wrap in try-catch to handle `ScryfallAPIError`
 
-4. **Add tests** (`src/scryfall/client.test.ts`):
+4. **Add tests** (`src/scryfall/client.test.ts` and/or `src/scryfall/formatter.test.ts`):
    - Test the new ScryfallClient method
    - Use real API calls (integration tests) - tests are expected to make actual network requests
+   - If adding field selection support, add formatter tests
 
 ## Rate Limiting Implementation
 
