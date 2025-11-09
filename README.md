@@ -7,9 +7,6 @@ A Model Context Protocol (MCP) server that surfaces the [Scryfall API](https://s
 - **Search Cards**: Find Magic cards using Scryfall's powerful search syntax
 - **Get Card Details**: Retrieve specific cards by name with fuzzy matching
 - **Random Cards**: Get random cards with optional filtering
-- **Card Rulings**: Access official card rulings and errata
-- **Set Information**: Query Magic: The Gathering set data
-- **Autocomplete**: Get card name suggestions as you type
 
 ## Available MCP Tools
 
@@ -36,24 +33,6 @@ Get a random Magic card.
 
 **Parameters:**
 - `query` (optional string): Filter random selection (e.g., "type:creature")
-
-### `get_rulings`
-Get official rulings for a card.
-
-**Parameters:**
-- `card_id` (string): Scryfall card ID
-
-### `get_set`
-Get information about a Magic set.
-
-**Parameters:**
-- `code` (string): Set code (e.g., "mkm" for Murders at Karlov Manor)
-
-### `autocomplete`
-Get card name suggestions.
-
-**Parameters:**
-- `query` (string): Partial card name to autocomplete
 
 ## Development Setup
 
@@ -162,7 +141,7 @@ Use the [mcp-remote proxy](https://www.npmjs.com/package/mcp-remote) to connect 
 
 3. For production, replace the URL with your deployed endpoint:
    ```json
-   "args": ["mcp-remote", "https://scryfall-mcp-server.<your-account>.workers.dev/sse"]
+   "args": ["mcp-remote", "scryfall-mcp-server.colin-hauch.workers.dev/sse"]
    ```
 
 4. Restart Claude Desktop
