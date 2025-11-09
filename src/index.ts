@@ -2,6 +2,9 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ScryfallClient, ScryfallAPIError } from "./scryfall/client";
+import { formatCard, formatCards } from "./scryfall/formatter.js";
+import type { CardField, CardFieldGroup } from "./scryfall/types.js";
+import searchSyntaxDoc from "../docs/scryfall-search-syntax.md";
 
 // Define our MCP agent with Scryfall tools
 export class MyMCP extends McpAgent {
@@ -17,11 +20,39 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"search_cards",
 			{
-				query: z
-					.string()
-					.describe(
-						"Scryfall search query (e.g., 'lightning bolt', 'type:creature color:red')",
-					),
+				query: z.string().describe(
+					`Scryfall search query. Common patterns:
+
+Basic Filters:
+  - Card name: "lightning bolt" or name:"dark ritual"
+  - Type: t:creature, t:instant, t:"legendary creature"
+  - Color: c:red, c:uw (blue/white), c>=2 (2+ colors)
+  - Oracle text: o:"draw a card", o:"enters the battlefield"
+
+Card Properties:
+  - Mana value: mv=3, mv<=2, mv>=7
+  - Mana cost: m:2ww (two generic + double white)
+  - Power/Toughness: pow>=5, tou<3, pow>tou
+
+Format & Rarity:
+  - Format legality: f:standard, f:commander, f:modern
+  - Rarity: r:rare, r:mythic, r:common
+
+Operators:
+  - Combine terms: "t:creature c:red pow>=4" (AND is implicit)
+  - OR operator: "t:elf or t:goblin"
+  - Negation: "-c:blue" or "not:reprint"
+  - Grouping: "t:legendary (t:elf or t:goblin)"
+
+Examples:
+  - "t:creature c:red pow>=5" → Red creatures with power 5+
+  - "o:\\"draw a card\\" f:standard" → Standard-legal cards with card draw
+  - "t:instant mv<=2 c:u" → Blue instants costing 2 or less
+  - "t:planeswalker (c:wr or c:wb)" → Red/white or white/black planeswalkers
+
+Advanced Syntax:
+For complex queries including regex, display options, set filters, and more, access the complete documentation via the MCP resource "Scryfall Search Syntax - Complete Reference" (URI: scryfall://search-syntax/full).`,
+				),
 				unique: z
 					.enum(["cards", "art", "prints"])
 					.optional()
@@ -48,8 +79,24 @@ export class MyMCP extends McpAgent {
 					.optional()
 					.describe("Sort direction"),
 				page: z.number().optional().describe("Page number for pagination"),
+				fields: z
+					.union([
+						z.array(z.string()),
+						z.enum([
+							"minimal",
+							"gameplay",
+							"print",
+							"pricing",
+							"imagery",
+							"full",
+						]),
+					])
+					.optional()
+					.describe(
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'print', 'pricing', 'imagery', 'full')",
+					),
 			},
-			async ({ query, unique, order, dir, page }) => {
+			async ({ query, unique, order, dir, page, fields }) => {
 				try {
 					const result = await this.scryfallClient.searchCards(query, {
 						unique,
@@ -58,6 +105,24 @@ export class MyMCP extends McpAgent {
 						page,
 					});
 
+					// If fields are specified, use the formatter
+					if (fields) {
+						const formatted = formatCards(
+							result.data,
+							fields as CardField[] | CardFieldGroup,
+							10,
+						);
+						return {
+							content: [
+								{
+									type: "text",
+									text: formatted,
+								},
+							],
+						};
+					}
+
+					// Default formatting (backward compatible)
 					const summary = `Found ${result.total_cards || result.data.length} cards matching "${query}"`;
 					const cardList = result.data
 						.slice(0, 10)
@@ -109,14 +174,47 @@ export class MyMCP extends McpAgent {
 					.string()
 					.optional()
 					.describe("Set code to filter by (e.g., 'mkm')"),
+				fields: z
+					.union([
+						z.array(z.string()),
+						z.enum([
+							"minimal",
+							"gameplay",
+							"print",
+							"pricing",
+							"imagery",
+							"full",
+						]),
+					])
+					.optional()
+					.describe(
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'print', 'pricing', 'imagery', 'full')",
+					),
 			},
-			async ({ name, fuzzy, set }) => {
+			async ({ name, fuzzy, set, fields }) => {
 				try {
 					const card = await this.scryfallClient.getCardNamed(name, {
 						fuzzy,
 						set,
 					});
 
+					// If fields are specified, use the formatter
+					if (fields) {
+						const formatted = formatCard(
+							card,
+							fields as CardField[] | CardFieldGroup,
+						);
+						return {
+							content: [
+								{
+									type: "text",
+									text: formatted,
+								},
+							],
+						};
+					}
+
+					// Default formatting (backward compatible)
 					const price = card.prices.usd ? `$${card.prices.usd}` : "N/A";
 					const text = card.oracle_text || "No oracle text";
 					const image =
@@ -172,11 +270,44 @@ Scryfall: ${card.scryfall_uri}`,
 					.describe(
 						"Optional search query to filter random selection (e.g., 'type:creature')",
 					),
+				fields: z
+					.union([
+						z.array(z.string()),
+						z.enum([
+							"minimal",
+							"gameplay",
+							"print",
+							"pricing",
+							"imagery",
+							"full",
+						]),
+					])
+					.optional()
+					.describe(
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'print', 'pricing', 'imagery', 'full')",
+					),
 			},
-			async ({ query }) => {
+			async ({ query, fields }) => {
 				try {
 					const card = await this.scryfallClient.getRandomCard(query);
 
+					// If fields are specified, use the formatter
+					if (fields) {
+						const formatted = formatCard(
+							card,
+							fields as CardField[] | CardFieldGroup,
+						);
+						return {
+							content: [
+								{
+									type: "text",
+									text: `**Random Card**\n\n${formatted}`,
+								},
+							],
+						};
+					}
+
+					// Default formatting (backward compatible)
 					const price = card.prices.usd ? `$${card.prices.usd}` : "N/A";
 					const image =
 						card.image_uris?.normal ||
@@ -218,139 +349,25 @@ Scryfall: ${card.scryfall_uri}`,
 			},
 		);
 
-		// Get card rulings
-		this.server.tool(
-			"get_rulings",
+		// Register comprehensive search syntax documentation resource
+		this.server.resource(
+			"Scryfall Search Syntax - Complete Reference",
+			"scryfall://search-syntax/full",
 			{
-				card_id: z.string().describe("Scryfall card ID"),
+				mimeType: "text/markdown",
+				description:
+					"Complete reference guide for constructing Scryfall search queries with all keywords, operators, and advanced filters",
 			},
-			async ({ card_id }) => {
-				try {
-					const result = await this.scryfallClient.getRulings(card_id);
-
-					if (result.data.length === 0) {
-						return {
-							content: [
-								{
-									type: "text",
-									text: "No rulings found for this card.",
-								},
-							],
-						};
-					}
-
-					const rulings = result.data
-						.map(
-							(ruling) =>
-								`**${ruling.published_at}** (${ruling.source})\n${ruling.comment}`,
-						)
-						.join("\n\n");
-
-					return {
-						content: [
-							{
-								type: "text",
-								text: `**Rulings (${result.data.length})**\n\n${rulings}`,
-							},
-						],
-					};
-				} catch (error) {
-					if (error instanceof ScryfallAPIError) {
-						return {
-							content: [
-								{
-									type: "text",
-									text: `Error getting rulings: ${error.details}`,
-								},
-							],
-							isError: true,
-						};
-					}
-					throw error;
-				}
-			},
-		);
-
-		// Get set information
-		this.server.tool(
-			"get_set",
-			{
-				code: z
-					.string()
-					.describe("Set code (e.g., 'mkm' for Murders at Karlov Manor)"),
-			},
-			async ({ code }) => {
-				try {
-					const set = await this.scryfallClient.getSet(code);
-
-					return {
-						content: [
-							{
-								type: "text",
-								text: `**${set.name}** (${set.code.toUpperCase()})
-
-Type: ${set.set_type}
-Released: ${set.released_at || "Not released"}
-Card Count: ${set.card_count}
-Digital: ${set.digital ? "Yes" : "No"}
-
-Icon: ${set.icon_svg_uri}
-Search: ${set.search_uri}
-Scryfall: ${set.scryfall_uri}`,
-							},
-						],
-					};
-				} catch (error) {
-					if (error instanceof ScryfallAPIError) {
-						return {
-							content: [
-								{
-									type: "text",
-									text: `Set not found: ${error.details}`,
-								},
-							],
-							isError: true,
-						};
-					}
-					throw error;
-				}
-			},
-		);
-
-		// Autocomplete card names
-		this.server.tool(
-			"autocomplete",
-			{
-				query: z.string().describe("Partial card name to autocomplete"),
-			},
-			async ({ query }) => {
-				try {
-					const result = await this.scryfallClient.autocomplete(query);
-
-					const suggestions = result.data.slice(0, 20).join(", ");
-
-					return {
-						content: [
-							{
-								type: "text",
-								text: `**Suggestions for "${query}"** (${result.total_values} total):\n\n${suggestions}`,
-							},
-						],
-					};
-				} catch (error) {
-					if (error instanceof ScryfallAPIError) {
-						return {
-							content: [
-								{
-									type: "text",
-									text: `Error getting autocomplete: ${error.details}`,
-								},
-							],
-							isError: true,
-						};
-					}
-					throw error;
-				}
+			async () => {
+				return {
+					contents: [
+						{
+							uri: "scryfall://search-syntax/full",
+							mimeType: "text/markdown",
+							text: searchSyntaxDoc,
+						},
+					],
+				};
 			},
 		);
 	}

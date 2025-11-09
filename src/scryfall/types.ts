@@ -189,3 +189,151 @@ export function isScryfallError(response: unknown): response is ScryfallError {
 		response.object === "error"
 	);
 }
+
+/**
+ * Field selection for card formatting
+ */
+
+// All available card fields that can be selected
+export type CardField =
+	| keyof ScryfallCard
+	| "prices.usd"
+	| "prices.usd_foil"
+	| "prices.usd_etched"
+	| "prices.eur"
+	| "prices.eur_foil"
+	| "prices.tix"
+	| "image_uris.small"
+	| "image_uris.normal"
+	| "image_uris.large"
+	| "image_uris.png"
+	| "image_uris.art_crop"
+	| "image_uris.border_crop";
+
+// Predefined field groups for convenience
+export type CardFieldGroup =
+	| "minimal"
+	| "gameplay"
+	| "print"
+	| "pricing"
+	| "imagery"
+	| "full";
+
+// Mapping of field groups to their actual fields
+export const FIELD_GROUP_MAPPINGS: Record<CardFieldGroup, CardField[]> = {
+	minimal: ["name", "mana_cost", "type_line", "oracle_text"],
+	gameplay: [
+		"name",
+		"mana_cost",
+		"type_line",
+		"oracle_text",
+		"colors",
+		"cmc",
+		"power",
+		"toughness",
+		"loyalty",
+		"legalities",
+	],
+	print: [
+		"name",
+		"mana_cost",
+		"type_line",
+		"oracle_text",
+		"colors",
+		"cmc",
+		"power",
+		"toughness",
+		"loyalty",
+		"legalities",
+		"set",
+		"set_name",
+		"rarity",
+		"collector_number",
+		"artist",
+	],
+	pricing: [
+		"name",
+		"mana_cost",
+		"type_line",
+		"oracle_text",
+		"colors",
+		"cmc",
+		"power",
+		"toughness",
+		"loyalty",
+		"legalities",
+		"set",
+		"set_name",
+		"rarity",
+		"collector_number",
+		"artist",
+		"prices",
+	],
+	imagery: [
+		"name",
+		"mana_cost",
+		"type_line",
+		"oracle_text",
+		"colors",
+		"cmc",
+		"power",
+		"toughness",
+		"loyalty",
+		"legalities",
+		"set",
+		"set_name",
+		"rarity",
+		"collector_number",
+		"artist",
+		"image_uris",
+		"illustration_id",
+	],
+	full: Object.keys({
+		object: true,
+		id: true,
+		oracle_id: true,
+		name: true,
+		lang: true,
+		released_at: true,
+		uri: true,
+		scryfall_uri: true,
+		layout: true,
+		highres_image: true,
+		image_status: true,
+		card_faces: true,
+		image_uris: true,
+		mana_cost: true,
+		cmc: true,
+		type_line: true,
+		oracle_text: true,
+		colors: true,
+		color_identity: true,
+		power: true,
+		toughness: true,
+		loyalty: true,
+		legalities: true,
+		reserved: true,
+		foil: true,
+		nonfoil: true,
+		set: true,
+		set_name: true,
+		set_type: true,
+		set_uri: true,
+		set_search_uri: true,
+		scryfall_set_uri: true,
+		rulings_uri: true,
+		prints_search_uri: true,
+		collector_number: true,
+		digital: true,
+		rarity: true,
+		flavor_text: true,
+		artist: true,
+		artist_ids: true,
+		illustration_id: true,
+		border_color: true,
+		frame: true,
+		prices: true,
+		related_uris: true,
+		purchase_uris: true,
+	}) as CardField[],
+};

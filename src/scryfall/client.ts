@@ -8,7 +8,6 @@ import type {
 	ScryfallCard,
 	ScryfallList,
 	ScryfallSet,
-	ScryfallRuling,
 	ScryfallSymbol,
 	ScryfallCatalog,
 	ScryfallError,
@@ -116,7 +115,7 @@ export class ScryfallClient {
 		// Handle HTTP 429 (Too Many Requests) with exponential backoff
 		if (response.status === 429) {
 			if (retryCount < this.maxRetries) {
-				const backoffTime = this.initialBackoff * Math.pow(2, retryCount);
+				const backoffTime = this.initialBackoff * 2 ** retryCount;
 				console.warn(
 					`Rate limit hit (429). Retrying after ${backoffTime}ms (attempt ${retryCount + 1}/${this.maxRetries})`,
 				);
@@ -233,40 +232,10 @@ export class ScryfallClient {
 	}
 
 	/**
-	 * Get autocomplete suggestions for card names
-	 */
-	async autocomplete(
-		query: string,
-		include_extras: boolean = false,
-	): Promise<ScryfallCatalog> {
-		const params = new URLSearchParams({ q: query });
-		if (include_extras) {
-			params.set("include_extras", "true");
-		}
-		return this.fetch<ScryfallCatalog>(
-			`/cards/autocomplete?${params.toString()}`,
-		);
-	}
-
-	/**
 	 * Get all sets
 	 */
 	async getSets(): Promise<ScryfallList<ScryfallSet>> {
 		return this.fetch<ScryfallList<ScryfallSet>>("/sets");
-	}
-
-	/**
-	 * Get a specific set by code
-	 */
-	async getSet(code: string): Promise<ScryfallSet> {
-		return this.fetch<ScryfallSet>(`/sets/${code}`);
-	}
-
-	/**
-	 * Get rulings for a card
-	 */
-	async getRulings(cardId: string): Promise<ScryfallList<ScryfallRuling>> {
-		return this.fetch<ScryfallList<ScryfallRuling>>(`/cards/${cardId}/rulings`);
 	}
 
 	/**
