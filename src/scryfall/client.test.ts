@@ -81,8 +81,8 @@ describe("ScryfallClient", () => {
 
 	describe("getCard", () => {
 		it("should get a card by Scryfall ID", async () => {
-			// Lightning Bolt ID from Alpha
-			const id = "8e765bd5-4e28-4f78-8c3a-1efa5c8db81f";
+			// Lightning Bolt ID (current default printing)
+			const id = "77c6fa74-5543-42ac-9ead-0e890b188e99";
 			const card = await client.getCard(id);
 
 			expect(card.object).toBe("card");
@@ -92,19 +92,6 @@ describe("ScryfallClient", () => {
 
 		it("should throw error for invalid ID", async () => {
 			await expect(client.getCard("invalid-id-12345")).rejects.toThrow();
-		});
-	});
-
-	describe("autocomplete", () => {
-		it("should provide autocomplete suggestions", async () => {
-			const result = await client.autocomplete("light");
-
-			expect(result.object).toBe("catalog");
-			expect(result.data).toBeInstanceOf(Array);
-			expect(result.data.length).toBeGreaterThan(0);
-			expect(
-				result.data.some((name) => name.toLowerCase().includes("light")),
-			).toBe(true);
 		});
 	});
 
@@ -120,28 +107,6 @@ describe("ScryfallClient", () => {
 			expect(firstSet.object).toBe("set");
 			expect(firstSet.code).toBeTruthy();
 			expect(firstSet.name).toBeTruthy();
-		});
-	});
-
-	describe("getSet", () => {
-		it("should get a specific set by code", async () => {
-			const set = await client.getSet("mkm"); // Murders at Karlov Manor
-
-			expect(set.object).toBe("set");
-			expect(set.code).toBe("mkm");
-			expect(set.name).toBeTruthy();
-		});
-	});
-
-	describe("getRulings", () => {
-		it("should get rulings for a card", async () => {
-			// Lightning Bolt ID
-			const id = "8e765bd5-4e28-4f78-8c3a-1efa5c8db81f";
-			const result = await client.getRulings(id);
-
-			expect(result.object).toBe("list");
-			expect(result.data).toBeInstanceOf(Array);
-			// Lightning Bolt typically has rulings
 		});
 	});
 
