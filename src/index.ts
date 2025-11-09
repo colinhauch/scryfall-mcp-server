@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ScryfallClient, ScryfallAPIError } from "./scryfall/client";
 import { formatCard, formatCards } from "./scryfall/formatter.js";
 import type { CardField, CardFieldGroup } from "./scryfall/types.js";
+import searchSyntaxDoc from "../docs/scryfall-search-syntax.md";
 
 // Define our MCP agent with Scryfall tools
 export class MyMCP extends McpAgent {
@@ -19,11 +20,39 @@ export class MyMCP extends McpAgent {
 		this.server.tool(
 			"search_cards",
 			{
-				query: z
-					.string()
-					.describe(
-						"Scryfall search query (e.g., 'lightning bolt', 'type:creature color:red')",
-					),
+				query: z.string().describe(
+					`Scryfall search query. Common patterns:
+
+Basic Filters:
+  - Card name: "lightning bolt" or name:"dark ritual"
+  - Type: t:creature, t:instant, t:"legendary creature"
+  - Color: c:red, c:uw (blue/white), c>=2 (2+ colors)
+  - Oracle text: o:"draw a card", o:"enters the battlefield"
+
+Card Properties:
+  - Mana value: mv=3, mv<=2, mv>=7
+  - Mana cost: m:2ww (two generic + double white)
+  - Power/Toughness: pow>=5, tou<3, pow>tou
+
+Format & Rarity:
+  - Format legality: f:standard, f:commander, f:modern
+  - Rarity: r:rare, r:mythic, r:common
+
+Operators:
+  - Combine terms: "t:creature c:red pow>=4" (AND is implicit)
+  - OR operator: "t:elf or t:goblin"
+  - Negation: "-c:blue" or "not:reprint"
+  - Grouping: "t:legendary (t:elf or t:goblin)"
+
+Examples:
+  - "t:creature c:red pow>=5" → Red creatures with power 5+
+  - "o:\\"draw a card\\" f:standard" → Standard-legal cards with card draw
+  - "t:instant mv<=2 c:u" → Blue instants costing 2 or less
+  - "t:planeswalker (c:wr or c:wb)" → Red/white or white/black planeswalkers
+
+Advanced Syntax:
+For complex queries including regex, display options, set filters, and more, access the complete documentation via the MCP resource "Scryfall Search Syntax - Complete Reference" (URI: scryfall://search-syntax/full).`,
+				),
 				unique: z
 					.enum(["cards", "art", "prints"])
 					.optional()
@@ -317,6 +346,28 @@ Scryfall: ${card.scryfall_uri}`,
 					}
 					throw error;
 				}
+			},
+		);
+
+		// Register comprehensive search syntax documentation resource
+		this.server.resource(
+			"Scryfall Search Syntax - Complete Reference",
+			"scryfall://search-syntax/full",
+			{
+				mimeType: "text/markdown",
+				description:
+					"Complete reference guide for constructing Scryfall search queries with all keywords, operators, and advanced filters",
+			},
+			async () => {
+				return {
+					contents: [
+						{
+							uri: "scryfall://search-syntax/full",
+							mimeType: "text/markdown",
+							text: searchSyntaxDoc,
+						},
+					],
+				};
 			},
 		);
 	}
