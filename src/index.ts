@@ -4,6 +4,11 @@ import { z } from "zod";
 import { ScryfallClient, ScryfallAPIError } from "./scryfall/client";
 import { formatCard, formatCards } from "./scryfall/formatter.js";
 import type { CardField, CardFieldGroup } from "./scryfall/types.js";
+import {
+	FIELD_GROUP_KEYS,
+	FIELD_GROUP_MAPPINGS,
+	ALL_VALID_FIELDS,
+} from "./scryfall/types.js";
 import searchSyntaxDoc from "../docs/scryfall-search-syntax.md";
 
 // Define our MCP agent with Scryfall tools
@@ -65,8 +70,6 @@ For complex queries including regex, display options, set filters, and more, acc
 						"rarity",
 						"color",
 						"usd",
-						"tix",
-						"eur",
 						"cmc",
 						"power",
 						"toughness",
@@ -80,20 +83,10 @@ For complex queries including regex, display options, set filters, and more, acc
 					.describe("Sort direction"),
 				page: z.number().optional().describe("Page number for pagination"),
 				fields: z
-					.union([
-						z.array(z.string()),
-						z.enum([
-							"minimal",
-							"gameplay",
-							"print",
-							"pricing",
-							"imagery",
-							"full",
-						]),
-					])
+					.union([z.array(z.string()), z.enum(FIELD_GROUP_KEYS)])
 					.optional()
 					.describe(
-						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'print', 'pricing', 'imagery', 'full')",
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'pricing', 'imagery', 'full'). For a complete list of available fields, see the 'Available Card Fields' resource at scryfall://fields/reference",
 					),
 			},
 			async ({ query, unique, order, dir, page, fields }) => {
@@ -175,20 +168,10 @@ For complex queries including regex, display options, set filters, and more, acc
 					.optional()
 					.describe("Set code to filter by (e.g., 'mkm')"),
 				fields: z
-					.union([
-						z.array(z.string()),
-						z.enum([
-							"minimal",
-							"gameplay",
-							"print",
-							"pricing",
-							"imagery",
-							"full",
-						]),
-					])
+					.union([z.array(z.string()), z.enum(FIELD_GROUP_KEYS)])
 					.optional()
 					.describe(
-						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'print', 'pricing', 'imagery', 'full')",
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'pricing', 'imagery', 'full'). For a complete list of available fields, see the 'Available Card Fields' resource at scryfall://fields/reference",
 					),
 			},
 			async ({ name, fuzzy, set, fields }) => {
@@ -271,20 +254,10 @@ Scryfall: ${card.scryfall_uri}`,
 						"Optional search query to filter random selection (e.g., 'type:creature')",
 					),
 				fields: z
-					.union([
-						z.array(z.string()),
-						z.enum([
-							"minimal",
-							"gameplay",
-							"print",
-							"pricing",
-							"imagery",
-							"full",
-						]),
-					])
+					.union([z.array(z.string()), z.enum(FIELD_GROUP_KEYS)])
 					.optional()
 					.describe(
-						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'print', 'pricing', 'imagery', 'full')",
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'pricing', 'imagery', 'full'). For a complete list of available fields, see the 'Available Card Fields' resource at scryfall://fields/reference",
 					),
 			},
 			async ({ query, fields }) => {
@@ -365,6 +338,75 @@ Scryfall: ${card.scryfall_uri}`,
 							uri: "scryfall://search-syntax/full",
 							mimeType: "text/markdown",
 							text: searchSyntaxDoc,
+						},
+					],
+				};
+			},
+		);
+
+		// Register field reference resource
+		this.server.resource(
+			"Available Card Fields",
+			"scryfall://fields/reference",
+			{
+				mimeType: "text/markdown",
+				description:
+					"Complete list of available fields for card data formatting with custom field arrays",
+			},
+			async () => {
+				const fieldDoc = `# Available Card Fields
+
+This reference lists all available fields you can use when requesting card data with custom field arrays.
+
+## Field Groups
+
+You can use predefined field groups for convenience:
+
+### minimal
+${FIELD_GROUP_MAPPINGS.minimal.map((f) => `- ${f}`).join("\n")}
+
+### gameplay
+${FIELD_GROUP_MAPPINGS.gameplay.map((f) => `- ${f}`).join("\n")}
+
+### pricing
+${FIELD_GROUP_MAPPINGS.pricing.map((f) => `- ${f}`).join("\n")}
+
+### imagery
+${FIELD_GROUP_MAPPINGS.imagery.map((f) => `- ${f}`).join("\n")}
+
+### full
+${FIELD_GROUP_MAPPINGS.full.map((f) => `- ${f}`).join("\n")}
+
+## All Valid Fields
+
+The predefined field group "full" contains all valid fields. 
+
+## Usage Examples
+
+### Using a predefined group:
+\`\`\`
+{ "fields": "minimal" }
+\`\`\`
+
+### Using a custom field array:
+\`\`\`
+{ "fields": ["name", "mana_cost", "prices"] }
+\`\`\`
+
+### Using nested fields:
+\`\`\`
+{ "fields": ["name", "prices.usd", "prices.eur"] }
+\`\`\`
+
+Note: Fields marked as objects (like "prices", "legalities", "image_uris") contain nested data. You can request the entire object or use dot notation for specific nested fields.
+`;
+
+				return {
+					contents: [
+						{
+							uri: "scryfall://fields/reference",
+							mimeType: "text/markdown",
+							text: fieldDoc,
 						},
 					],
 				};
