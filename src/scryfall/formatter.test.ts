@@ -316,10 +316,10 @@ describe("formatCard", () => {
 			expect(result).toContain("legalities:");
 		});
 
-		it("formats with print group", () => {
-			const result = formatCard(mockSingleFacedCard, "print");
+		it("formats with full group", () => {
+			const result = formatCard(mockSingleFacedCard, "full");
 			expect(result).toContain("**Lightning Bolt**");
-			expect(result).toContain("set: lea");
+			expect(result).toContain("id: test-id-1");
 			expect(result).toContain("set_name: Limited Edition Alpha");
 			expect(result).toContain("rarity: common");
 			expect(result).toContain("collector_number: 161");
@@ -367,9 +367,9 @@ describe("formatCard", () => {
 		});
 
 		it("includes card-level properties for double-faced cards", () => {
-			const result = formatCard(mockDoubleFacedCard, "print");
+			const result = formatCard(mockDoubleFacedCard, "full");
 			expect(result).toContain("Card Properties:");
-			expect(result).toContain("set: isd");
+			expect(result).toContain("id: test-id-2");
 			expect(result).toContain("rarity: common");
 		});
 
