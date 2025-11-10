@@ -214,7 +214,6 @@ export type CardField =
 export type CardFieldGroup =
 	| "minimal"
 	| "gameplay"
-	| "print"
 	| "pricing"
 	| "imagery"
 	| "full";
@@ -224,116 +223,81 @@ export const FIELD_GROUP_MAPPINGS: Record<CardFieldGroup, CardField[]> = {
 	minimal: ["name", "mana_cost", "type_line", "oracle_text"],
 	gameplay: [
 		"name",
+		"card_faces",
 		"mana_cost",
+		"cmc",
 		"type_line",
 		"oracle_text",
 		"colors",
-		"cmc",
+		"color_identity",
 		"power",
 		"toughness",
 		"loyalty",
 		"legalities",
-	],
-	print: [
-		"name",
-		"mana_cost",
-		"type_line",
-		"oracle_text",
-		"colors",
-		"cmc",
-		"power",
-		"toughness",
-		"loyalty",
-		"legalities",
-		"set",
-		"set_name",
 		"rarity",
-		"collector_number",
-		"artist",
 	],
-	pricing: [
+	pricing: ["name", "prices"],
+	imagery: ["name", "artist", "image_uris", "illustration_id"],
+	full: [
+		"id",
 		"name",
+		"released_at",
+		"layout",
+		"card_faces",
 		"mana_cost",
+		"cmc",
 		"type_line",
 		"oracle_text",
 		"colors",
-		"cmc",
+		"color_identity",
 		"power",
 		"toughness",
 		"loyalty",
 		"legalities",
-		"set",
+		"reserved",
 		"set_name",
-		"rarity",
+		"set_type",
 		"collector_number",
+		"digital",
+		"rarity",
+		"flavor_text",
 		"artist",
+		"frame",
 		"prices",
 	],
-	imagery: [
-		"name",
-		"mana_cost",
-		"type_line",
-		"oracle_text",
-		"colors",
-		"cmc",
-		"power",
-		"toughness",
-		"loyalty",
-		"legalities",
-		"set",
-		"set_name",
-		"rarity",
-		"collector_number",
-		"artist",
-		"image_uris",
-		"illustration_id",
-	],
-	full: Object.keys({
-		object: true,
-		id: true,
-		oracle_id: true,
-		name: true,
-		lang: true,
-		released_at: true,
-		uri: true,
-		scryfall_uri: true,
-		layout: true,
-		highres_image: true,
-		image_status: true,
-		card_faces: true,
-		image_uris: true,
-		mana_cost: true,
-		cmc: true,
-		type_line: true,
-		oracle_text: true,
-		colors: true,
-		color_identity: true,
-		power: true,
-		toughness: true,
-		loyalty: true,
-		legalities: true,
-		reserved: true,
-		foil: true,
-		nonfoil: true,
-		set: true,
-		set_name: true,
-		set_type: true,
-		set_uri: true,
-		set_search_uri: true,
-		scryfall_set_uri: true,
-		rulings_uri: true,
-		prints_search_uri: true,
-		collector_number: true,
-		digital: true,
-		rarity: true,
-		flavor_text: true,
-		artist: true,
-		artist_ids: true,
-		illustration_id: true,
-		border_color: true,
-		frame: true,
-		prices: true,
-		related_uris: true,
-		purchase_uris: true,
-	}) as CardField[],
 };
+
+// Helper to get all field group keys for use in Zod schemas
+export const FIELD_GROUP_KEYS = Object.keys(FIELD_GROUP_MAPPINGS) as [
+	CardFieldGroup,
+	...CardFieldGroup[],
+];
+
+// All valid field names - derived from the 'full' group for validation
+export const ALL_VALID_FIELDS = FIELD_GROUP_MAPPINGS.full;
+
+/**
+ * Validate field names against the list of valid fields
+ * @param fields - Array of field names to validate
+ * @returns Object containing valid fields and warnings for invalid ones
+ */
+export function validateFields(fields: string[]): {
+	valid: string[];
+	warnings: string[];
+} {
+	const valid: string[] = [];
+	const warnings: string[] = [];
+	const validFieldSet = new Set(ALL_VALID_FIELDS);
+
+	for (const field of fields) {
+		if (validFieldSet.has(field as CardField)) {
+			valid.push(field);
+		} else {
+			warnings.push(
+				`Field '${field}' is not a recognized field. See scryfall://fields/reference for available fields.`,
+			);
+		}
+	}
+
+	return { valid, warnings };
+}
