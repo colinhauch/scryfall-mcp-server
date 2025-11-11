@@ -1,15 +1,11 @@
-import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpAgent } from "agents/mcp";
 import { z } from "zod";
-import { ScryfallClient, ScryfallAPIError } from "./scryfall/client";
+import searchSyntaxDoc from "../docs/scryfall-search-syntax.md";
+import { ScryfallAPIError, ScryfallClient } from "./scryfall/client";
 import { formatCard, formatCards } from "./scryfall/formatter.js";
 import type { CardField, CardFieldGroup } from "./scryfall/types.js";
-import {
-	FIELD_GROUP_KEYS,
-	FIELD_GROUP_MAPPINGS,
-	ALL_VALID_FIELDS,
-} from "./scryfall/types.js";
-import searchSyntaxDoc from "../docs/scryfall-search-syntax.md";
+import { FIELD_GROUP_KEYS, FIELD_GROUP_MAPPINGS } from "./scryfall/types.js";
 
 // Define our MCP agent with Scryfall tools
 export class MyMCP extends McpAgent {
@@ -84,9 +80,9 @@ For complex queries including regex, display options, set filters, and more, acc
 				page: z.number().optional().describe("Page number for pagination"),
 				fields: z
 					.union([z.array(z.string()), z.enum(FIELD_GROUP_KEYS)])
-					.optional()
+					.default("minimal")
 					.describe(
-						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'pricing', 'imagery', 'full'). For a complete list of available fields, see the 'Available Card Fields' resource at scryfall://fields/reference",
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'pricing', 'imagery', 'full'). Defaults to 'minimal'. For a complete list of available fields, see the 'Available Card Fields' resource at scryfall://fields/reference",
 					),
 			},
 			async ({ query, unique, order, dir, page, fields }) => {
@@ -98,42 +94,17 @@ For complex queries including regex, display options, set filters, and more, acc
 						page,
 					});
 
-					// If fields are specified, use the formatter
-					if (fields) {
-						const formatted = formatCards(
-							result.data,
-							fields as CardField[] | CardFieldGroup,
-							10,
-						);
-						return {
-							content: [
-								{
-									type: "text",
-									text: formatted,
-								},
-							],
-						};
-					}
-
-					// Default formatting (backward compatible)
-					const summary = `Found ${result.total_cards || result.data.length} cards matching "${query}"`;
-					const cardList = result.data
-						.slice(0, 10)
-						.map((card) => {
-							const price = card.prices.usd ? `$${card.prices.usd}` : "N/A";
-							return `- ${card.name} (${card.set.toUpperCase()}) - ${card.type_line} - ${price}`;
-						})
-						.join("\n");
-
-					const hasMore = result.has_more
-						? "\n\n(More results available - use page parameter)"
-						: "";
-
+					// Use the formatter with the specified (or default) fields
+					// Returns all cards from the current page (up to 175)
+					const formatted = formatCards(
+						result.data,
+						fields as CardField[] | CardFieldGroup,
+					);
 					return {
 						content: [
 							{
 								type: "text",
-								text: `${summary}\n\n${cardList}${hasMore}`,
+								text: formatted,
 							},
 						],
 					};
@@ -154,75 +125,88 @@ For complex queries including regex, display options, set filters, and more, acc
 			},
 		);
 
-		// Get a specific card by name
+		// Get detailed information for one or more cards by name
 		this.server.tool(
-			"get_card",
+			"get_card_details",
 			{
-				name: z.string().describe("Card name to search for"),
-				fuzzy: z
-					.boolean()
-					.optional()
-					.describe("Use fuzzy name matching (default: false)"),
+				names: z
+					.array(z.string())
+					.max(75)
+					.describe(
+						"Array of card names to search for (can be a single card or multiple cards). Maximum 75 cards per request.",
+					),
 				set: z
 					.string()
 					.optional()
-					.describe("Set code to filter by (e.g., 'mkm')"),
+					.describe("Set code to filter by for all cards (e.g., 'mkm')"),
 				fields: z
 					.union([z.array(z.string()), z.enum(FIELD_GROUP_KEYS)])
-					.optional()
+					.default("gameplay")
 					.describe(
-						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'pricing', 'imagery', 'full'). For a complete list of available fields, see the 'Available Card Fields' resource at scryfall://fields/reference",
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'pricing', 'imagery', 'full'). Defaults to 'gameplay'. For a complete list of available fields, see the 'Available Card Fields' resource at scryfall://fields/reference",
 					),
 			},
-			async ({ name, fuzzy, set, fields }) => {
+			async ({ names, set, fields }) => {
 				try {
-					const card = await this.scryfallClient.getCardNamed(name, {
-						fuzzy,
-						set,
+					// Build identifiers for the collection endpoint
+					const identifiers = names.map((name) => {
+						if (set) {
+							return { name, set };
+						}
+						return { name };
 					});
 
-					// If fields are specified, use the formatter
-					if (fields) {
-						const formatted = formatCard(
-							card,
-							fields as CardField[] | CardFieldGroup,
-						);
+					// Use the collection endpoint (single API call for all cards)
+					const result = await this.scryfallClient.getCollection(identifiers);
+
+					// If no cards were found, return error
+					if (result.data.length === 0) {
+						const notFoundList = result.not_found
+							? result.not_found
+									.map((id) => {
+										if ("name" in id) {
+											return `"${id.name}"${id.set ? ` (${id.set})` : ""}`;
+										}
+										return JSON.stringify(id);
+									})
+									.join(", ")
+							: "all requested cards";
+
 						return {
 							content: [
 								{
 									type: "text",
-									text: formatted,
+									text: `No cards found. Not found: ${notFoundList}`,
 								},
 							],
+							isError: true,
 						};
 					}
 
-					// Default formatting (backward compatible)
-					const price = card.prices.usd ? `$${card.prices.usd}` : "N/A";
-					const text = card.oracle_text || "No oracle text";
-					const image =
-						card.image_uris?.normal ||
-						card.card_faces?.[0]?.image_uris?.normal ||
-						"No image";
+					// Format the successful results
+					const formatted = formatCards(
+						result.data,
+						fields as CardField[] | CardFieldGroup,
+					);
+
+					// Add error messages if some cards weren't found
+					const errorSection =
+						result.not_found && result.not_found.length > 0
+							? `\n\n**Not found (${result.not_found.length}):**\n${result.not_found
+									.map((id) => {
+										if ("name" in id) {
+											return `- "${id.name}"${id.set ? ` (${id.set})` : ""}`;
+										}
+										return `- ${JSON.stringify(id)}`;
+									})
+									.join("\n")}`
+							: "";
 
 					return {
 						content: [
 							{
 								type: "text",
-								text: `**${card.name}** (${card.set.toUpperCase()} ${card.collector_number})
-Mana Cost: ${card.mana_cost || "N/A"}
-Type: ${card.type_line}
-${card.power && card.toughness ? `Power/Toughness: ${card.power}/${card.toughness}` : ""}
-${card.loyalty ? `Loyalty: ${card.loyalty}` : ""}
-
-${text}
-
-Price: ${price}
-Rarity: ${card.rarity}
-Artist: ${card.artist || "Unknown"}
-
-Image: ${image}
-Scryfall: ${card.scryfall_uri}`,
+								text: `${formatted}${errorSection}`,
 							},
 						],
 					};
@@ -232,7 +216,7 @@ Scryfall: ${card.scryfall_uri}`,
 							content: [
 								{
 									type: "text",
-									text: `Card not found: ${error.details}`,
+									text: `Error fetching cards: ${error.details}`,
 								},
 							],
 							isError: true,
@@ -255,53 +239,25 @@ Scryfall: ${card.scryfall_uri}`,
 					),
 				fields: z
 					.union([z.array(z.string()), z.enum(FIELD_GROUP_KEYS)])
-					.optional()
+					.default("gameplay")
 					.describe(
-						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'pricing', 'imagery', 'full'). For a complete list of available fields, see the 'Available Card Fields' resource at scryfall://fields/reference",
+						"Optional field selection - either an array of field names (e.g., ['name', 'mana_cost', 'prices']) or a predefined group ('minimal', 'gameplay', 'pricing', 'imagery', 'full'). Defaults to 'gameplay'. For a complete list of available fields, see the 'Available Card Fields' resource at scryfall://fields/reference",
 					),
 			},
 			async ({ query, fields }) => {
 				try {
 					const card = await this.scryfallClient.getRandomCard(query);
 
-					// If fields are specified, use the formatter
-					if (fields) {
-						const formatted = formatCard(
-							card,
-							fields as CardField[] | CardFieldGroup,
-						);
-						return {
-							content: [
-								{
-									type: "text",
-									text: `**Random Card**\n\n${formatted}`,
-								},
-							],
-						};
-					}
-
-					// Default formatting (backward compatible)
-					const price = card.prices.usd ? `$${card.prices.usd}` : "N/A";
-					const image =
-						card.image_uris?.normal ||
-						card.card_faces?.[0]?.image_uris?.normal ||
-						"No image";
-
+					// Use the formatter with the specified (or default) fields
+					const formatted = formatCard(
+						card,
+						fields as CardField[] | CardFieldGroup,
+					);
 					return {
 						content: [
 							{
 								type: "text",
-								text: `**Random Card: ${card.name}**
-
-Mana Cost: ${card.mana_cost || "N/A"}
-Type: ${card.type_line}
-Set: ${card.set_name} (${card.set.toUpperCase()})
-
-${card.oracle_text || "No oracle text"}
-
-Price: ${price}
-Image: ${image}
-Scryfall: ${card.scryfall_uri}`,
+								text: `**Random Card**\n\n${formatted}`,
 							},
 						],
 					};

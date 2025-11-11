@@ -2,6 +2,39 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Branching Strategy
+
+**IMPORTANT**: This repository follows a three-branch workflow:
+
+- **`main`**: Production branch - stable, deployed code only
+- **`test`**: Staging branch - tested features ready for production
+- **`dev`**: Development branch - active development and integration
+
+### Workflow Rules
+
+1. **Daily Development**: Work on feature branches created from `dev`
+2. **Creating PRs**: Use `/create-pr` command (defaults to `test` branch)
+   - Feature branches → `test` (default)
+   - `test` → `main` (after testing)
+3. **Branch Protection**: Never commit directly to `main` or `test`
+4. **Deployment**: Only `main` triggers auto-deployment to production
+
+### Typical Flow
+
+```bash
+# Start new feature
+git checkout dev
+git checkout -b feat/my-feature
+
+# ... make changes ...
+
+# Create PR to test branch
+/create-pr              # defaults to test
+
+# After approval and testing in test branch
+/create-pr main         # promote to production
+```
+
 ## Project Overview
 
 This is a Model Context Protocol (MCP) server that wraps the Scryfall API for Magic: The Gathering card data. It runs as a Cloudflare Worker using Cloudflare Durable Objects for MCP agent state management.
@@ -33,14 +66,36 @@ Comprehensive TypeScript interfaces mirroring the Scryfall API schema. When addi
 - Supports both custom field arrays (e.g., `["name", "mana_cost", "prices.usd"]`) and predefined groups (e.g., `"minimal"`, `"gameplay"`)
 - Handles single-faced and multi-faced cards appropriately
 
-## Development Commands
+## Local Development Setup
 
-### Running Locally
+### Prerequisites
+- Node.js 20+
+- npm
+- Cloudflare account (for deployment)
+
+### Getting Started
+
+1. **Clone and install:**
+   ```bash
+   git clone https://github.com/your-username/scryfall-mcp-server.git
+   cd scryfall-mcp-server
+   npm install
+   ```
+
+2. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+   The server will be available at `http://localhost:8787`
+
+### Development Commands
+
+#### Running Locally
 ```bash
 npm run dev        # Start Wrangler dev server on localhost:8787
 ```
 
-### Testing
+#### Testing
 ```bash
 npm test                  # Run all tests once
 npm run test:watch        # Run tests in watch mode
@@ -49,7 +104,7 @@ npm run test:coverage     # Run tests with coverage report
 
 **Important**: Tests use Vitest with `@cloudflare/vitest-pool-workers` to simulate the Cloudflare Workers environment. Tests for the Scryfall client disable rate limiting with `requestDelay: 0` to speed up test execution.
 
-### Code Quality
+#### Code Quality
 ```bash
 npm run format       # Auto-format with Biome
 npm run lint:fix     # Auto-fix linting issues
@@ -58,16 +113,27 @@ npm run type-check   # TypeScript type checking (no emit)
 
 **Note**: Biome replaces both Prettier and ESLint. Configuration is in `biome.json`.
 
-### Deployment
+#### Deployment
 ```bash
 npm run deploy    # Manual deploy to Cloudflare Workers
 ```
 
 Auto-deployment occurs on push to `main` via GitHub Actions (requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets).
 
+### GitHub Actions Setup
+
+For automatic deployment, configure these secrets in your GitHub repository (Settings > Secrets and variables > Actions):
+
+- **`CLOUDFLARE_API_TOKEN`**: Your Cloudflare API token
+  - Create at: https://dash.cloudflare.com/profile/api-tokens
+  - Required permissions: "Edit Cloudflare Workers"
+
+- **`CLOUDFLARE_ACCOUNT_ID`**: Your Cloudflare account ID
+  - Find at: https://dash.cloudflare.com (right sidebar)
+
 ## Using Field Selection
 
-The card-related MCP tools (`search_cards`, `get_card`, `get_random_card`) support optional field selection to control which card data is returned, allowing agents to modulate context usage.
+The card-related MCP tools (`search_cards`, `get_card_details`, `get_random_card`) support optional field selection to control which card data is returned, allowing agents to modulate context usage.
 
 ### Field Selection Options
 
@@ -78,11 +144,10 @@ fields: ["name", "mana_cost", "prices.usd"]
 
 **Predefined Groups**: Use convenient shortcuts
 - `"minimal"` - Basic card info: name, mana_cost, type_line, oracle_text
-- `"gameplay"` - Gameplay-relevant: minimal + colors, cmc, power, toughness, loyalty, legalities
-- `"print"` - Print info: gameplay + set, set_name, rarity, collector_number, artist
-- `"pricing"` - Price data: print + prices
-- `"imagery"` - Image data: print + image_uris, illustration_id
-- `"full"` - All available fields (default behavior when no fields specified)
+- `"gameplay"` - Gameplay-relevant: minimal + colors, color_identity, cmc, power, toughness, loyalty, rarity
+- `"pricing"` - Price data: name, prices
+- `"imagery"` - Image data: name, artist, image_uris, illustration_id
+- `"full"` - All available fields
 
 ### Nested Field Access
 
@@ -97,14 +162,14 @@ fields: ["name", "prices.usd", "prices.eur", "image_uris.normal"]
 // Minimal context - just the essentials
 search_cards({ query: "lightning bolt", fields: "minimal" })
 
-// Custom selection for specific use case
-get_card({ name: "Black Lotus", fields: ["name", "mana_cost", "prices.usd", "legalities"] })
+// Custom selection for specific use case - single card
+get_card_details({ names: ["Black Lotus"], fields: ["name", "mana_cost", "prices.usd", "legalities"] })
+
+// Multiple cards at once
+get_card_details({ names: ["Black Lotus", "Mox Ruby", "Ancestral Recall"] })
 
 // Predefined group for gameplay analysis
 search_cards({ query: "type:creature power>=5", fields: "gameplay" })
-
-// No fields parameter = default formatting (backward compatible)
-get_card({ name: "Mox Ruby" })
 ```
 
 ### Behavior Notes
@@ -216,3 +281,43 @@ new ScryfallClient({
   initialBackoff: 1000
 })
 ```
+
+## Project Structure
+
+```
+scryfall-mcp-server/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml          # CI: Lint, type-check, test
+│       └── deploy.yml      # Auto-deploy to Cloudflare on push to main
+├── docs/
+│   └── scryfall-search-syntax.md  # Complete search syntax reference
+├── src/
+│   ├── index.ts            # Main MCP server (MyMCP class, tool registration)
+│   ├── index.test.ts       # Server integration tests
+│   └── scryfall/
+│       ├── client.ts       # Scryfall API client with rate limiting
+│       ├── client.test.ts  # API client tests
+│       ├── formatter.ts    # Card formatting with field selection
+│       ├── formatter.test.ts  # Formatter tests
+│       └── types.ts        # TypeScript types for Scryfall API
+├── biome.json              # Biome formatter/linter config
+├── package.json            # Dependencies and scripts
+├── tsconfig.json           # TypeScript configuration
+├── vitest.config.ts        # Vitest test configuration
+├── wrangler.jsonc          # Cloudflare Workers configuration
+├── CLAUDE.md               # Developer instructions (this file)
+└── README.md               # User-facing documentation
+```
+
+## Technology Stack
+
+- **Runtime**: Cloudflare Workers (serverless edge computing)
+- **MCP Framework**: Cloudflare Agents (`agents/mcp`)
+- **MCP SDK**: `@modelcontextprotocol/sdk` (for MCP server implementation)
+- **Language**: TypeScript
+- **Testing**: Vitest with `@cloudflare/vitest-pool-workers` (Workers runtime simulation)
+- **Code Quality**: Biome (unified formatter + linter)
+- **CI/CD**: GitHub Actions
+- **Deployment**: Wrangler (Cloudflare CLI)
+- **API**: Scryfall REST API v1
