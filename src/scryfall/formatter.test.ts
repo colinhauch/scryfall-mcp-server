@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { formatCard, formatCards } from "./formatter.js";
 import type { ScryfallCard } from "./types.js";
 

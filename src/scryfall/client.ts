@@ -5,13 +5,13 @@
  */
 
 import type {
+	CardIdentifier,
 	ScryfallCard,
+	ScryfallCatalog,
+	ScryfallError,
 	ScryfallList,
 	ScryfallSet,
 	ScryfallSymbol,
-	ScryfallCatalog,
-	ScryfallError,
-	CardIdentifier,
 } from "./types";
 import { isScryfallError } from "./types";
 

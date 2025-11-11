@@ -1,15 +1,11 @@
-import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpAgent } from "agents/mcp";
 import { z } from "zod";
-import { ScryfallClient, ScryfallAPIError } from "./scryfall/client";
+import searchSyntaxDoc from "../docs/scryfall-search-syntax.md";
+import { ScryfallAPIError, ScryfallClient } from "./scryfall/client";
 import { formatCard, formatCards } from "./scryfall/formatter.js";
 import type { CardField, CardFieldGroup } from "./scryfall/types.js";
-import {
-	FIELD_GROUP_KEYS,
-	FIELD_GROUP_MAPPINGS,
-	ALL_VALID_FIELDS,
-} from "./scryfall/types.js";
-import searchSyntaxDoc from "../docs/scryfall-search-syntax.md";
+import { FIELD_GROUP_KEYS, FIELD_GROUP_MAPPINGS } from "./scryfall/types.js";
 
 // Define our MCP agent with Scryfall tools
 export class MyMCP extends McpAgent {

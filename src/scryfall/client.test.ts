@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { ScryfallClient, ScryfallAPIError } from "./client";
+import { beforeEach, describe, expect, it } from "vitest";
+import { ScryfallAPIError, ScryfallClient } from "./client";
 
 describe("ScryfallClient", () => {
 	let client: ScryfallClient;

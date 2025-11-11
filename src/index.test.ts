@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 describe("Scryfall MCP Server", () => {
 	// Skipping due to Cloudflare runtime compatibility issues in test environment
