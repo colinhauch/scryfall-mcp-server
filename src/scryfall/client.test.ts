@@ -153,6 +153,76 @@ describe("ScryfallClient", () => {
 		});
 	});
 
+	describe("getCollection", () => {
+		it("should get multiple cards by name", async () => {
+			const result = await client.getCollection([
+				{ name: "Lightning Bolt" },
+				{ name: "Dark Ritual" },
+				{ name: "Counterspell" },
+			]);
+
+			expect(result.object).toBe("list");
+			expect(result.data).toBeInstanceOf(Array);
+			expect(result.data.length).toBe(3);
+
+			const names = result.data.map((card) => card.name);
+			expect(names).toContain("Lightning Bolt");
+			expect(names).toContain("Dark Ritual");
+			expect(names).toContain("Counterspell");
+		});
+
+		it("should get cards with set filter", async () => {
+			const result = await client.getCollection([
+				{ name: "Lightning Bolt", set: "lea" }, // Alpha
+			]);
+
+			expect(result.object).toBe("list");
+			expect(result.data.length).toBe(1);
+			expect(result.data[0].name).toBe("Lightning Bolt");
+			expect(result.data[0].set).toBe("lea");
+		});
+
+		it("should handle mixed identifiers", async () => {
+			const result = await client.getCollection([
+				{ name: "Black Lotus" },
+				{ set: "lea", collector_number: "233" }, // Mountain from Alpha
+			]);
+
+			expect(result.object).toBe("list");
+			expect(result.data).toBeInstanceOf(Array);
+			expect(result.data.length).toBe(2);
+		});
+
+		it("should return not_found for missing cards", async () => {
+			const result = await client.getCollection([
+				{ name: "Lightning Bolt" },
+				{ name: "ThisCardDoesNotExist123456" },
+			]);
+
+			expect(result.object).toBe("list");
+			expect(result.data.length).toBe(1);
+			expect(result.data[0].name).toBe("Lightning Bolt");
+			expect(result.not_found).toBeDefined();
+			expect(result.not_found?.length).toBe(1);
+		});
+
+		it("should throw error for empty identifiers", async () => {
+			await expect(client.getCollection([])).rejects.toThrow(
+				"At least one identifier is required",
+			);
+		});
+
+		it("should throw error for more than 75 identifiers", async () => {
+			const identifiers = Array.from({ length: 76 }, (_, i) => ({
+				name: `Card ${i}`,
+			}));
+
+			await expect(client.getCollection(identifiers)).rejects.toThrow(
+				"Maximum 75 identifiers allowed",
+			);
+		});
+	});
+
 	describe("error handling", () => {
 		it("should handle API errors gracefully", async () => {
 			try {

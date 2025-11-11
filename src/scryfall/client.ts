@@ -11,6 +11,7 @@ import type {
 	ScryfallSymbol,
 	ScryfallCatalog,
 	ScryfallError,
+	CardIdentifier,
 } from "./types";
 import { isScryfallError } from "./types";
 
@@ -278,5 +279,32 @@ export class ScryfallClient {
 			| "ability-words",
 	): Promise<ScryfallCatalog> {
 		return this.fetch<ScryfallCatalog>(`/catalog/${catalogType}`);
+	}
+
+	/**
+	 * Get a collection of cards by identifiers
+	 * Maximum 75 identifiers per request
+	 * https://scryfall.com/docs/api/cards/collection
+	 */
+	async getCollection(
+		identifiers: CardIdentifier[],
+	): Promise<ScryfallList<ScryfallCard>> {
+		if (identifiers.length === 0) {
+			throw new Error("At least one identifier is required");
+		}
+
+		if (identifiers.length > 75) {
+			throw new Error(
+				"Maximum 75 identifiers allowed per request. Use multiple requests for larger collections.",
+			);
+		}
+
+		return this.fetch<ScryfallList<ScryfallCard>>("/cards/collection", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ identifiers }),
+		});
 	}
 }
