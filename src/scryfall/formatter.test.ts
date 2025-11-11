@@ -313,7 +313,8 @@ describe("formatCard", () => {
 			expect(result).toContain("power: *");
 			expect(result).toContain("toughness: *+1");
 			expect(result).toContain("colors: G");
-			expect(result).toContain("legalities:");
+			expect(result).toContain("rarity: rare");
+			// Note: legalities is no longer in the gameplay group
 		});
 
 		it("formats with full group", () => {
