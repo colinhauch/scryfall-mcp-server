@@ -130,7 +130,21 @@ export interface ScryfallList<T> {
 	next_page?: string;
 	data: T[];
 	warnings?: string[];
+	not_found?: CardIdentifier[]; // For collection endpoint
 }
+
+/**
+ * Card identifiers for the collection endpoint
+ * https://scryfall.com/docs/api/cards/collection
+ */
+export type CardIdentifier =
+	| { id: string } // Scryfall ID
+	| { mtgo_id: number } // Magic Online ID
+	| { multiverse_id: number } // Multiverse ID
+	| { oracle_id: string } // Oracle ID
+	| { illustration_id: string } // Illustration ID
+	| { name: string; set?: string } // Card name, optionally with set code
+	| { set: string; collector_number: string }; // Set code + collector number
 
 export interface ScryfallSet {
 	object: "set";
@@ -233,7 +247,6 @@ export const FIELD_GROUP_MAPPINGS: Record<CardFieldGroup, CardField[]> = {
 		"power",
 		"toughness",
 		"loyalty",
-		"legalities",
 		"rarity",
 	],
 	pricing: ["name", "prices"],

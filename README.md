@@ -1,128 +1,16 @@
 # Scryfall MCP Server
 
-A Model Context Protocol (MCP) server that surfaces the [Scryfall API](https://scryfall.com/docs/api) for Magic: The Gathering card data. Deployed on Cloudflare Workers with automatic CI/CD.
+A Model Context Protocol (MCP) server that surfaces the [Scryfall API](https://scryfall.com/docs/api) for Magic: The Gathering card data. Deployed on Cloudflare Workers.
 
-## Features
+## Quick Start
 
-- **Search Cards**: Find Magic cards using Scryfall's powerful search syntax
-- **Get Card Details**: Retrieve specific cards by name with fuzzy matching
-- **Random Cards**: Get random cards with optional filtering
-
-## Available MCP Tools
-
-### `search_cards`
-Search for Magic cards using Scryfall's search syntax.
-
-**Parameters:**
-- `query` (string): Search query (e.g., "lightning bolt", "type:creature color:red")
-- `unique` (optional): Strategy for omitting similar cards ("cards", "art", "prints")
-- `order` (optional): Sort order (name, set, released, rarity, color, usd, etc.)
-- `dir` (optional): Sort direction (auto, asc, desc)
-- `page` (optional): Page number for pagination
-
-### `get_card`
-Get a specific card by name.
-
-**Parameters:**
-- `name` (string): Card name to search for
-- `fuzzy` (optional boolean): Use fuzzy name matching
-- `set` (optional string): Filter by set code (e.g., "mkm")
-
-### `get_random_card`
-Get a random Magic card.
-
-**Parameters:**
-- `query` (optional string): Filter random selection (e.g., "type:creature")
-
-## Development Setup
-
-### Prerequisites
-- Node.js 20+
-- npm
-- Cloudflare account (for deployment)
-
-### Local Development
-
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
-
-   The server will be available at `http://localhost:8787`
-
-3. **Run tests:**
-   ```bash
-   npm test              # Run tests once
-   npm run test:watch    # Watch mode
-   npm run test:coverage # With coverage report
-   ```
-
-4. **Code quality:**
-   ```bash
-   npm run format     # Format code with Biome
-   npm run lint:fix   # Fix linting issues
-   npm run type-check # TypeScript type checking
-   ```
-
-## Deployment
-
-### Automatic Deployment (Recommended)
-
-This repository is configured for automatic deployment to Cloudflare Workers via GitHub Actions.
-
-1. **Set up GitHub Secrets:**
-
-   Go to your GitHub repository Settings > Secrets and variables > Actions, and add:
-
-   - `CLOUDFLARE_API_TOKEN`: Your Cloudflare API token
-     - Create at: https://dash.cloudflare.com/profile/api-tokens
-     - Required permissions: "Edit Cloudflare Workers"
-
-   - `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare account ID
-     - Find at: https://dash.cloudflare.com (right sidebar)
-
-2. **Deploy:**
-
-   Simply push to the `main` branch:
-   ```bash
-   git add .
-   git commit -m "Deploy changes"
-   git push origin main
-   ```
-
-   GitHub Actions will automatically:
-   - Run linting and type checks
-   - Run tests
-   - Deploy to Cloudflare Workers if all checks pass
-
-### Manual Deployment
-
-Deploy directly to Cloudflare Workers:
-
-```bash
-npm run deploy
-```
-
-Your server will be deployed to: `https://scryfall-mcp-server.<your-account>.workers.dev`
-
-## Connecting to MCP Clients
-
-### Cloudflare AI Playground
-
-1. Go to https://playground.ai.cloudflare.com/
-2. Enter your deployed MCP server URL: `scryfall-mcp-server.<your-account>.workers.dev/sse`
-3. Start using the Scryfall tools!
+Configure your AI client to connect to the deployed instance of the server or download this repo and run it locally. 
 
 ### Claude Desktop
 
-Use the [mcp-remote proxy](https://www.npmjs.com/package/mcp-remote) to connect Claude Desktop to your server.
+To use this MCP server with Claude Desktop, you'll need the [mcp-remote](https://www.npmjs.com/package/mcp-remote) proxy.
 
-1. Open Claude Desktop settings: Settings > Developer > Edit Config
+1. Open Claude Desktop settings: **Settings > Developer > Edit Config**
 2. Add this configuration:
 
    ```json
@@ -132,147 +20,218 @@ Use the [mcp-remote proxy](https://www.npmjs.com/package/mcp-remote) to connect 
          "command": "npx",
          "args": [
            "mcp-remote",
-           "http://localhost:8787/sse"
+           "https://scryfall-mcp-server.colin-hauch.workers.dev/sse"
          ]
        }
      }
    }
    ```
 
-3. For production, replace the URL with your deployed endpoint:
-   ```json
-   "args": ["mcp-remote", "scryfall-mcp-server.colin-hauch.workers.dev/sse"]
-   ```
+3. Restart Claude Desktop
 
-4. Restart Claude Desktop
+### Local Development
+```json
+{
+  "mcpServers": {
+    "scryfall": {
+      "command": "npx",
+      "args": ["mcp-remote", "http://localhost:8787/sse"]
+    }
+  }
+}
+```
+
+### Cloudflare AI Playground
+
+1. Go to [https://playground.ai.cloudflare.com/](https://playground.ai.cloudflare.com/?model=@cf/mistralai/mistral-small-3.1-24b-instruct)
+2. Pick a model (`mistral-small-3.1-24b-instruct` is selected by default here)
+2. Enter your MCP server URL: `https://scryfall-mcp-server.colin-hauch.workers.dev`
+3. Start using the Scryfall tools!
 
 ### Other MCP Clients
 
-Any MCP client can connect to the server via:
-- SSE endpoint: `/sse`
-- MCP endpoint: `/mcp`
+Any MCP-compatible client can connect to the server via:
+- **SSE endpoint**: `/sse` (recommended for most clients)
+- **MCP endpoint**: `/mcp` (for clients that support direct MCP protocol)
 
-## Project Structure
+## Features
 
-```
-scryfall-mcp-server/
-├── .github/
-│   └── workflows/
-│       ├── ci.yml          # CI: Lint, type-check, test
-│       └── deploy.yml      # Auto-deploy to Cloudflare
-├── src/
-│   ├── index.ts            # Main MCP server implementation
-│   ├── index.test.ts       # Server tests
-│   └── scryfall/
-│       ├── client.ts       # Scryfall API client
-│       ├── client.test.ts  # API client tests
-│       └── types.ts        # TypeScript types for Scryfall API
-├── biome.json              # Biome formatter/linter config
-├── package.json            # Dependencies and scripts
-├── tsconfig.json           # TypeScript configuration
-├── vitest.config.ts        # Vitest test configuration
-└── wrangler.jsonc          # Cloudflare Workers configuration
-```
+- **Search Cards**: Find Magic cards using Scryfall's powerful search syntax
+- **Get Card Details**: Retrieve specific cards by name with fuzzy matching
+- **Random Cards**: Get random cards with optional filtering
+- **Field Selection**: Control exactly which card data is returned to optimize context usage
 
-## Development Workflow
+## Available MCP Tools
 
-### Branching Strategy
+### `search_cards`
+Search for Magic cards using Scryfall's search syntax. Returns all results from the current page (up to 175 cards).
 
-- `main` - Production branch (auto-deploys)
-- `feature/*` - New features
-- `fix/*` - Bug fixes
+**Parameters:**
+- `query` (string, required): Search query using Scryfall syntax
+  - Examples: `"lightning bolt"`, `"type:creature color:red"`, `"f:commander pow>=5"`
+- `unique` (string, optional): Strategy for omitting similar cards
+  - Options: `"cards"`, `"art"`, `"prints"`
+- `order` (string, optional): Sort order
+  - Options: `"name"`, `"set"`, `"released"`, `"rarity"`, `"color"`, `"usd"`, `"cmc"`, `"power"`, `"toughness"`, `"edhrec"`
+- `dir` (string, optional): Sort direction
+  - Options: `"auto"`, `"asc"`, `"desc"`
+- `page` (number, optional): Page number for pagination (1-based). Use to access results beyond the first 175.
+- `fields` (array or string, optional): Control which card data is returned (defaults to `"minimal"`)
+  - Predefined groups: `"minimal"`, `"gameplay"`, `"pricing"`, `"imagery"`, `"full"`
+  - Custom array: `["name", "mana_cost", "prices.usd"]`
+  - See "Field Selection" section below for details
 
-### Making Changes
-
-1. Create a feature branch:
-   ```bash
-   git checkout -b feature/my-feature
-   ```
-
-2. Make your changes and test:
-   ```bash
-   npm run dev        # Test locally
-   npm test           # Run tests
-   npm run type-check # Check types
-   ```
-
-3. Commit and push:
-   ```bash
-   git add .
-   git commit -m "Add my feature"
-   git push origin feature/my-feature
-   ```
-
-4. Open a Pull Request on GitHub
-   - CI will automatically run tests and checks
-   - Merge to `main` when ready
-   - Automatic deployment will trigger
-
-## Technology Stack
-
-- **Runtime**: Cloudflare Workers (serverless edge computing)
-- **MCP SDK**: [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/sdk)
-- **Agent Framework**: [Cloudflare Agents](https://developers.cloudflare.com/agents/)
-- **Language**: TypeScript
-- **Testing**: Vitest with Cloudflare Workers pool
-- **Code Quality**: Biome (formatter + linter)
-- **CI/CD**: GitHub Actions
-- **Deployment**: Wrangler (Cloudflare CLI)
-
-## API Rate Limiting
-
-The Scryfall client implements comprehensive rate limiting to comply with [Scryfall API guidelines](https://scryfall.com/docs/api):
-
-### Automatic Rate Limiting
-- **Default delay**: 100ms between requests (Scryfall recommends 50-100ms)
-- **Configurable**: Customize delay via `ScryfallClientOptions`
-- **Prevents HTTP 429**: Proactive rate limiting avoids "Too Many Requests" errors
-
-### HTTP 429 Retry with Exponential Backoff
-When rate limits are exceeded, the client automatically retries with exponential backoff:
-- **Default retries**: 3 attempts
-- **Backoff strategy**: 1s, 2s, 4s (exponential)
-- **Configurable**: Customize via `maxRetries` and `initialBackoff` options
-
-### Configuration Options
-
-```typescript
-const client = new ScryfallClient({
-  requestDelay: 100,      // Delay between requests (ms)
-  maxRetries: 3,          // Max retry attempts for 429 errors
-  initialBackoff: 1000,   // Initial backoff time (ms)
-  userAgent: 'your-app',  // Custom User-Agent
-});
+**Example:**
+```json
+{
+  "query": "type:creature power>=5",
+  "order": "power",
+  "fields": "gameplay"
+}
 ```
 
-### Best Practices
-- **Cache responses**: Store card data locally for 24+ hours
-- **Batch requests**: Group related queries when possible
-- **Monitor logs**: Watch for rate limit warnings in console
-- **Adjust delays**: Increase `requestDelay` if you frequently hit 429s
+**Pagination example:**
+```json
+{
+  "query": "type:creature",
+  "page": 2
+}
+```
 
-### Error Handling
-The client throws `ScryfallAPIError` with detailed information:
-- HTTP status code
-- Error code from Scryfall
-- Human-readable error message
+### `get_card_details`
+Get detailed information for one or more cards by exact name. Uses Scryfall's collection endpoint for efficient bulk lookups (up to 75 cards per request with a single API call).
 
-## Contributing
+**Parameters:**
+- `names` (array of strings, required): Exact card names to search for (can be single or multiple, max 75)
+- `set` (string, optional): Filter by set code for all cards (e.g., `"mkm"`, `"one"`)
+- `fields` (array or string, optional): Control which card data is returned (defaults to `"gameplay"`)
+  - Predefined groups: `"minimal"`, `"gameplay"`, `"pricing"`, `"imagery"`, `"full"`
+  - Custom array: `["name", "mana_cost", "prices.usd"]`
+  - See "Field Selection" section below for details
 
-This is a portfolio project demonstrating industry-standard practices:
-- Automated testing
-- CI/CD pipeline
-- Type safety
-- Code quality tooling
-- Comprehensive documentation
+**Note:** This tool uses exact name matching. Card names must match exactly (case-insensitive).
+
+**Examples:**
+
+Single card:
+```json
+{
+  "names": ["Black Lotus"],
+  "fields": ["name", "mana_cost", "prices", "legalities"]
+}
+```
+
+Multiple cards:
+```json
+{
+  "names": ["Black Lotus", "Mox Ruby", "Ancestral Recall"],
+  "fields": "gameplay"
+}
+```
+
+### `get_random_card`
+Get a random Magic card.
+
+**Parameters:**
+- `query` (string, optional): Filter random selection using Scryfall search syntax (e.g., `"type:creature"`)
+- `fields` (array or string, optional): Control which card data is returned
+  - Predefined groups: `"minimal"`, `"gameplay"`, `"pricing"`, `"imagery"`, `"full"`
+  - Custom array: `["name", "mana_cost", "prices.usd"]`
+  - See "Field Selection" section below for details
+
+**Example:**
+```json
+{
+  "query": "type:legendary",
+  "fields": "minimal"
+}
+```
+
+## Field Selection
+
+All card-related tools support optional field selection to control which data is returned, helping you optimize context usage in your AI workflows.
+
+### Predefined Field Groups
+
+Use these convenient presets for common use cases:
+
+- **`"minimal"`** - Essential card info: name, mana_cost, type_line, oracle_text
+- **`"gameplay"`** - Gameplay-relevant data: minimal + colors, color_identity, cmc, power, toughness, loyalty, rarity
+- **`"pricing"`** - Price information: name, prices
+- **`"imagery"`** - Image data: name, artist, image_uris, illustration_id
+- **`"full"`** - All available fields (default when `fields` is not specified)
+
+### Custom Field Arrays
+
+Specify exactly which fields you need:
+
+```json
+{
+  "name": "Lightning Bolt",
+  "fields": ["name", "mana_cost", "oracle_text", "prices.usd"]
+}
+```
+
+### Nested Fields
+
+Access nested object properties using dot notation:
+
+```json
+{
+  "query": "format:vintage",
+  "fields": ["name", "prices.usd", "prices.eur", "image_uris.normal"]
+}
+```
+
+### Available Fields Reference
+
+The MCP server provides a resource at `scryfall://fields/reference` with a complete list of all available fields. Access this through your MCP client to see all options.
+
+### Examples
+
+**Minimal context for quick lookups:**
+```json
+{
+  "query": "lightning bolt",
+  "fields": "minimal"
+}
+```
+
+**Price checking:**
+```json
+{
+  "names": ["Mox Ruby"],
+  "fields": ["name", "set", "prices.usd", "prices.usd_foil"]
+}
+```
+
+**Gameplay analysis:**
+```json
+{
+  "query": "type:creature cmc<=2",
+  "fields": "gameplay"
+}
+```
+
+## MCP Resources
+
+The server exposes additional resources for enhanced functionality:
+
+### `scryfall://search-syntax/full`
+Complete reference guide for Scryfall search syntax with all keywords, operators, and advanced filters.
+
+### `scryfall://fields/reference`
+Complete list of available fields for custom field selection with examples and usage guidance.
+
+### Rate Limiting & Performance
+
+The server implements comprehensive rate limiting to respect [Scryfall API guidelines](https://scryfall.com/docs/api):
+
+- **Proactive rate limiting**: 100ms delay between requests
+- **Automatic retries**: Exponential backoff on HTTP 429 errors (1s → 2s → 4s)
+- **Error handling**: Structured error responses with detailed messages
 
 ## License
 
 This project is provided as-is for portfolio and educational purposes.
 
-## Resources
-
-- [Scryfall API Documentation](https://scryfall.com/docs/api)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [Cloudflare Workers](https://developers.cloudflare.com/workers/)
-- [MCP SDK](https://github.com/modelcontextprotocol/sdk) 

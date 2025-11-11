@@ -9,7 +9,14 @@
 		"enabled": true
 	},
 	"files": {
-		"includes": ["**", "!worker-configuration.d.ts", "src/**/*"]
+		"ignore": [
+			"**/node_modules/**",
+			"**/.wrangler/**",
+			"**/dist/**",
+			"**/build/**",
+			"**/coverage/**",
+			"worker-configuration.d.ts"
+		]
 	},
 	"formatter": {
 		"enabled": true,
