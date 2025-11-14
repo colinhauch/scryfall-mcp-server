@@ -82,10 +82,10 @@ Return the created PR URL to the user.
 Creates PR from current branch to `test`.
 
 ```
-/create-pr main
+/create-pr prod
 ```
 
-Creates PR from current branch to `main`.
+Creates PR from current branch to `prod`.
 
 ## Notes
 
